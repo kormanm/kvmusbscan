@@ -62,6 +62,8 @@ Please publish first:
     $shortcut = $wsh.CreateShortcut("$StartMenu\KVM USB Recovery.lnk")
     $shortcut.TargetPath = Join-Path $InstallDir $ExeName
     $shortcut.Save()
+    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($shortcut) | Out-Null
+    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($wsh) | Out-Null
     Write-Host "  Start-Menu shortcut created" -ForegroundColor Green
 
     Write-Host "Installation complete." -ForegroundColor Green

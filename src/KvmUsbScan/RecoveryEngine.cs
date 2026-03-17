@@ -145,13 +145,16 @@ internal sealed class RecoveryEngine
 
             string stdout = proc.StandardOutput.ReadToEnd();
             string stderr = proc.StandardError.ReadToEnd();
-            proc.WaitForExit(10_000); // max 10 s
+            bool exited = proc.WaitForExit(10_000); // max 10 s
+
+            if (!exited)
+                Logger.Log("    WARNING: pnputil did not exit within 10 s – possible hang");
 
             if (!string.IsNullOrWhiteSpace(stdout))
                 Logger.Log($"    stdout: {stdout.Trim()}");
             if (!string.IsNullOrWhiteSpace(stderr))
                 Logger.Log($"    stderr: {stderr.Trim()}");
-            Logger.Log($"    Exit  : {proc.ExitCode}");
+            Logger.Log($"    Exit  : {(exited ? proc.ExitCode.ToString() : "timeout")}");
         }
         catch (Exception ex)
         {
