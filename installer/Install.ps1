@@ -1,3 +1,4 @@
+#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
     Install or uninstall KVM USB Recovery.
@@ -27,8 +28,6 @@ param(
     [switch]$Uninstall,
     [string]$InstallDir = "$env:ProgramFiles\KvmUsbScan"
 )
-
-#Requires -RunAsAdministrator
 
 $ErrorActionPreference = 'Stop'
 $AppName    = 'KvmUsbScan'

@@ -32,11 +32,16 @@ internal static class DeviceEnumerator
     {
         var devices = new List<DeviceInfo>();
 
-        // Retrieve USB + HID devices, and any device currently flagged with an error.
+        // Retrieve USB + HID devices, and any USB-related device currently flagged with an error.
+        // The error clause is intentionally restricted to DeviceIDs starting with 'USB' or 'HID'
+        // to avoid including unrelated broken hardware (e.g. audio, display adapters) that could
+        // be disrupted by pnputil enable/disable operations.
         const string query =
             "SELECT DeviceID, PNPClass, Status, ConfigManagerErrorCode, Name " +
             "FROM Win32_PnPEntity " +
-            "WHERE PNPClass = 'USB' OR PNPClass = 'HIDClass' OR ConfigManagerErrorCode != 0";
+            "WHERE PNPClass = 'USB' " +
+            "OR PNPClass = 'HIDClass' " +
+            "OR (ConfigManagerErrorCode != 0 AND (DeviceID LIKE 'USB%' OR DeviceID LIKE 'HID%'))";
 
         try
         {

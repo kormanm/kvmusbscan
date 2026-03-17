@@ -19,7 +19,9 @@ internal sealed class TrayApp : ApplicationContext
     private DisplayMonitor? _displayMonitor;
     private SynchronizationContext? _uiContext;
     private CancellationTokenSource? _recoveryCts;
-    private volatile bool _isRecovering;
+    // 0 = idle, 1 = running.  Interlocked.CompareExchange is used to set/clear atomically
+    // so concurrent triggers (display callback + manual) cannot both enter RunRecoveryAsync.
+    private int _recoveryRunning;
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -99,7 +101,7 @@ internal sealed class TrayApp : ApplicationContext
     /// </summary>
     private void OnExternalDisplayAppeared()
     {
-        if (_isRecovering)
+        if (Volatile.Read(ref _recoveryRunning) == 1)
         {
             Logger.Log("Display event received but recovery already in progress – skipped");
             return;
@@ -119,7 +121,7 @@ internal sealed class TrayApp : ApplicationContext
 
     private void TriggerManualRecovery()
     {
-        if (_isRecovering)
+        if (Volatile.Read(ref _recoveryRunning) == 1)
         {
             MessageBox.Show(
                 "Recovery is already in progress.",
@@ -135,8 +137,9 @@ internal sealed class TrayApp : ApplicationContext
 
     private async Task RunRecoveryAsync()
     {
-        if (_isRecovering) return;
-        _isRecovering = true;
+        // Atomically acquire the "running" slot; bail out if another thread beat us to it.
+        if (Interlocked.CompareExchange(ref _recoveryRunning, 1, 0) != 0)
+            return;
 
         var cts = new CancellationTokenSource();
         var old = Interlocked.Exchange(ref _recoveryCts, cts);
@@ -167,7 +170,7 @@ internal sealed class TrayApp : ApplicationContext
         }
         finally
         {
-            _isRecovering = false;
+            Interlocked.Exchange(ref _recoveryRunning, 0);
         }
     }
 

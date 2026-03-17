@@ -10,10 +10,10 @@
 #define MyAppVersion   "1.0.0"
 #define MyAppPublisher "kormanm"
 #define MyAppExeName   "KvmUsbScan.exe"
-#define MyAppId        "{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}"
 
 [Setup]
-AppId={{#MyAppId}
+; AppId uses {{ to produce a literal { so the resulting value is the standard {GUID} format.
+AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
