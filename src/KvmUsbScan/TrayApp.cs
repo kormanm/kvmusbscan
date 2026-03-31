@@ -23,6 +23,11 @@ internal sealed class TrayApp : ApplicationContext
     // so concurrent triggers (display callback + manual) cannot both enter RunRecoveryAsync.
     private int _recoveryRunning;
 
+    // Number of automatic retries after a failed display-triggered recovery.
+    // USB devices can take 30–90 s to fully re-enumerate in WMI after a KVM switch.
+    private const int AutoRetryCount = 3;
+    private const int AutoRetryDelayMs = 30_000;
+
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool DestroyIcon(IntPtr hIcon);
@@ -115,7 +120,7 @@ internal sealed class TrayApp : ApplicationContext
         Task.Run(async () =>
         {
             await Task.Delay(2_000);
-            await RunRecoveryAsync();
+            await RunRecoveryAsync(autoRetries: AutoRetryCount);
         });
     }
 
@@ -132,10 +137,10 @@ internal sealed class TrayApp : ApplicationContext
         }
 
         Logger.Log("Manual recovery triggered via tray menu");
-        Task.Run(RunRecoveryAsync);
+        Task.Run(() => RunRecoveryAsync());
     }
 
-    private async Task RunRecoveryAsync()
+    private async Task RunRecoveryAsync(int autoRetries = 0)
     {
         // Atomically acquire the "running" slot; bail out if another thread beat us to it.
         if (Interlocked.CompareExchange(ref _recoveryRunning, 1, 0) != 0)
@@ -149,6 +154,24 @@ internal sealed class TrayApp : ApplicationContext
         try
         {
             bool success = await _recoveryEngine.AttemptRecoveryAsync(cts.Token);
+
+            for (int attempt = 1; attempt <= autoRetries && !success; attempt++)
+            {
+                Logger.Log($"Auto-retry {attempt}/{autoRetries}: waiting {AutoRetryDelayMs / 1000} s for USB devices to re-enumerate...");
+                await Task.Delay(AutoRetryDelayMs, cts.Token);
+                try
+                {
+                    success = await _recoveryEngine.AttemptRecoveryAsync(cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Auto-retry {attempt}/{autoRetries} error: {ex.Message}");
+                }
+            }
 
             string title = success ? "Recovery Successful" : "Recovery Complete";
             string message = success
